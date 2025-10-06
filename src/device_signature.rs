@@ -1,24 +1,27 @@
-use core::ptr::addr_of;
 use cortex_m::interrupt;
 use rp2040_hal::pac;
 use rp2040_hal::rom_data;
+use static_cell::StaticCell;
+
+const DEVICE_ID_LEN: usize = 22;
+static DEVICE_ID_STR: StaticCell<[u8; DEVICE_ID_LEN]> = StaticCell::new();
 
 pub fn device_id_hex() -> &'static str {
-    static mut DEVICE_ID_STR: [u8; 22] = [0; 22];
+    let mut device_id_str = [0; DEVICE_ID_LEN];
 
     unsafe {
         interrupt::free(|_| {
-            if DEVICE_ID_STR.as_ptr().read_volatile() == 0 {
-                let hex = b"0123456789abcdef";
-                for (i, b) in read_uid().iter().chain(read_jedec().iter()).enumerate() {
-                    let lo = b & 0xf;
-                    let hi = (b >> 4) & 0xf;
-                    DEVICE_ID_STR[i * 2] = hex[hi as usize];
-                    DEVICE_ID_STR[i * 2 + 1] = hex[lo as usize];
-                }
+            let hex = b"0123456789abcdef";
+            for (i, b) in read_uid().iter().chain(read_jedec().iter()).enumerate() {
+                let lo = b & 0xf;
+                let hi = (b >> 4) & 0xf;
+                device_id_str[i * 2] = hex[hi as usize];
+                device_id_str[i * 2 + 1] = hex[lo as usize];
             }
         });
-        core::str::from_utf8_unchecked(&*addr_of!(DEVICE_ID_STR))
+
+        let id = DEVICE_ID_STR.init(device_id_str);
+        core::str::from_utf8_unchecked(id)
     }
 }
 
